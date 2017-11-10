@@ -1,0 +1,9 @@
+{
+	"Dropbox": {
+		"token": "insert_OAuth_token_here",
+		"directories": [{
+			"local": "full_path_to_local_directory",
+			"remote": "full_path_to_dropbox_directory"
+		}]
+	}
+}
