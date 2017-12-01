@@ -11,7 +11,7 @@ class SyncDropbox:
 
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.ERROR)
-    file_handler = logging.FileHandler('errors.log')
+    file_handler = logging.FileHandler('sync_dropbox.log')
     formatter = logging.Formatter('%(asctime)s: %(message)s')
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
@@ -24,6 +24,7 @@ class SyncDropbox:
         """
         - Loop through local directories listed in config.json.
         - Walk through each subdirectory and download a list of the corresponding dropbox files.
+        - If local file is old, delete local and remote version, else:
         - If local file is in the list of remote files: compare meta data and sync
             - else: upload new file (which will create the relevant directory if it doesn't already exist in Dropbox)
         """
@@ -34,18 +35,39 @@ class SyncDropbox:
                 for local_file in local_files:
                     local_file_path = os.path.join(local_root, local_file)
                     local_file = unicodedata.normalize('NFC', local_file)
-                    if local_file in remote_listing:
-                        self.compare_meta_data(local_file_path=local_file_path,
-                                               remote_file_meta_data=remote_listing[local_file],
-                                               remote_root=directory['remote'],
-                                               subdirectory=subdirectory,
-                                               file_name=local_file)
+                    days_since_modified = self.days_since_modified(local_file_path)
+                    if days_since_modified > directory['delete_old_days'] > 0:
+                        self.delete_old_file(local_file_path=local_file_path, file_name=local_file, remote_listing=remote_listing)
                     else:
-                        self.logger.info('{} new local file. Uploading to Dropbox'.format(local_file_path))
-                        self.upload(local_file_path=local_file_path,
-                                    remote_root=directory['remote'],
-                                    subdirectory=subdirectory,
-                                    file_name=local_file)
+                        if local_file in remote_listing:
+                            self.compare_meta_data(local_file_path=local_file_path,
+                                                   remote_file_meta_data=remote_listing[local_file],
+                                                   remote_root=directory['remote'],
+                                                   subdirectory=subdirectory,
+                                                   file_name=local_file)
+                        else:
+                            self.logger.info('{} new local file. Uploading to Dropbox'.format(local_file_path))
+                            self.upload(local_file_path=local_file_path,
+                                        remote_root=directory['remote'],
+                                        subdirectory=subdirectory,
+                                        file_name=local_file)
+
+    def days_since_modified(self, local_file_path):
+        local_file_mtime = os.path.getmtime(local_file_path)
+        local_file_mtime_dt = datetime.datetime(*time.gmtime(local_file_mtime)[:6])
+        return (datetime.datetime.today() - local_file_mtime_dt).days
+
+    def delete_old_file(self, local_file_path, file_name, remote_listing):
+        if file_name in remote_listing:
+            remote_file_path = remote_listing[file_name].path_display
+            try:
+                self.dbx.files_delete(remote_file_path)
+            except dropbox.exceptions.ApiError as err:
+                self.logger.error('Error: {} remote Dropbox file could not be deleted.'.format(file_name))
+            else:
+                self.logger.info('{} Dropbox file deleted.'.format(file_name))
+        os.remove(local_file_path)
+        self.logger.info('{} local file deleted.'.format(file_name))
 
     def compare_meta_data(self, local_file_path, remote_file_meta_data, remote_root, subdirectory, file_name):
         """
@@ -61,7 +83,7 @@ class SyncDropbox:
         else:
             if (local_file_mtime_dt > remote_file_meta_data.client_modified
                     and not self.compare_file_hash(local_file_path=local_file_path, remote_file_meta_data=remote_file_meta_data)):
-                print('{} changed locally after remote file. Uploading new version to dropbox'.format(local_file_path))
+                self.logger.info('{} changed locally after remote file. Uploading new version to dropbox'.format(local_file_path))
                 self.upload(local_file_path=local_file_path,
                             remote_root=remote_root,
                             subdirectory=subdirectory,
@@ -69,7 +91,7 @@ class SyncDropbox:
                             overwrite=True)
             elif (local_file_mtime_dt < remote_file_meta_data.client_modified
                     and not self.compare_file_hash(local_file_path=local_file_path, remote_file_meta_data=remote_file_meta_data)):
-                print('{} changed remotely after local file. Downloading new version from dropbox'.format(local_file_path))
+                self.logger.info('{} changed remotely after local file. Downloading new version from dropbox'.format(local_file_path))
                 downloaded_file = self.download(remote_root=remote_root, subdirectory=subdirectory, file_name=file_name)
                 if downloaded_file is not None:
                     with open(local_file_path, 'wb') as local_file:
