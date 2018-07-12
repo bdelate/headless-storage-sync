@@ -18,6 +18,18 @@ Currently only supports Dropbox.
 3. Generate an access token for the app
 4. Make a copy of the `config_template.json` file and rename it as `config.json`
 `$ cp ./config_template.json ./config.json`
+```
+{
+	"Dropbox": {
+		"token": "insert_OAuth_token_here",
+		"directories": [{
+			"local": "full_path_to_local_directory",
+			"remote": "full_path_to_dropbox_directory",
+			"delete_old_days": 0
+		}]
+	}
+}
+```
 5. Edit 'config.json' and enter the relevant local and dropbox directories to sync
   * All sub directories and files will be synced
   * To sync multiple root directories (and all sub directories), create additional json blocks within the directories list. Each directories item requires the fields: `local`, `remote`, `delete_old_days`
