@@ -1,18 +1,20 @@
 # headless-storage-sync
-Cloud storage sync for headless Linux servers
 
-Currently only supports Dropbox.
+Command line based sync of local directories and content with dropbox.
 
 ### Features
+
 * Monitor multiple folders on the server
 * Upload new or modified files from server to Dropbox
 * Download modified files from Dropbox to server (if the files already exist on the server)
 * Optionally delete files older than X days on the server and Dropbox
 
-### Requirements
-* dropbox-sdk-python (pip install dropbox)
+### Installation
+
+* pipenv install
 
 ### Usage
+
 1. Have a valid Dropbox account
 2. Register a new dropbox app for your account: https://www.dropbox.com/developers/apps
 3. Generate an access token for the app
@@ -36,5 +38,5 @@ Currently only supports Dropbox.
 6. Use the `delete_old_days` field to indicate when old files (locally and on Dropbox) should be deleted. A value of 0 means files will not be deleted.
 7. Enter the app token generated in step 3 into the `token` field
 
-Use cron to run this on a schedule. If using a virtualenv, ensure cron uses the python installed in the virtualenv. The following example will run daily at 1am:
+To run on a schedule, use cron or similar. If using a virtualenv, ensure cron uses the python installed in the virtualenv. The following example will run daily at 1am:
 > 00 01 * * * cd /full/path/to/headless-storage-sync && /full/path/to/venv/bin/python run.py
